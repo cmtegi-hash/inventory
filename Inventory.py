@@ -41,11 +41,6 @@ else:
         ("Avenge Pro", "1 Gal / 3.78 L"),
         ("Rob's Solvent Sealer", "1 Gal / 3.78 L"),
         ("Bio Break", "6 Lbs / 2.72 Kg"),
-        ("Groutmaster", "6.5 Lbs / 2.95 Kg"),
-        ("Pure O2", "8 Lbs / 3.62 Kg"),
-        ("Triplephase", "1 Gal / 3.78 L"),
-        ("Green Guard (Protector)", "1 Gal / 3.78 L"),
-        ("Citrus Burst", "1 Gal / 3.78 L"),
         # Agrega más productos según tu lista
     ]
     df = pd.DataFrame([{"Item": i+1, "Description": desc, "Unit": unit} for i, (desc, unit) in enumerate(productos)])
@@ -63,21 +58,10 @@ if col_name not in st.session_state.df.columns:
 # --- Editor para ingresar cantidades ---
 columns_to_show = ["Description", col_name]
 
-# Ajuste de ancho de columnas y edición
-column_config = {
-    "Description": st.column_config.Column(
-        width="medium", editable=False
-    ),
-    col_name: st.column_config.Column(
-        width="small", editable=True
-    )
-}
-
 edited_df = st.data_editor(
     st.session_state.df[columns_to_show],
     num_rows="dynamic",
-    use_container_width=True,
-    column_config=column_config
+    use_container_width=True
 )
 
 # --- Guardar en Google Sheets ---
