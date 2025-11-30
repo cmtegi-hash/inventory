@@ -12,20 +12,17 @@ st.title("📦 Inventory – Carpet Cleaner")
 # --- Google Sheets ---
 SHEET_NAME = "inventory_carpet"
 WORKSHEET_NAME = "inventory_test"
-
-# --- Cargar credenciales desde secrets ---
-creds_json = st.secrets["GOOGLE_CREDENTIALS"]
-creds_dict = json.loads(creds_json)
-creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
+# --- Credenciales desde secretos ---
+creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"]["GOOGLE_CREDENTIALS"])
 creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 client = gspread.authorize(creds)
 
+# --- Acceder hoja ---
 try:
     sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 except gspread.SpreadsheetNotFound:
@@ -70,10 +67,7 @@ else:
         ("Filter Free", "Quarter / 0.94 L"),
         ("All Solvent Extreme", "0.35 L"),
     ]
-    df = pd.DataFrame([
-        {"Item": i+1, "Description": desc, "Unit": unit} 
-        for i, (desc, unit) in enumerate(productos)
-    ])
+    df = pd.DataFrame([{"Item": i+1, "Description": desc, "Unit": unit} for i, (desc, unit) in enumerate(productos)])
 
 # --- Sesión ---
 if "df" not in st.session_state:
@@ -104,18 +98,14 @@ if len(cols_dates) >= 2:
     st.session_state.fecha_actual = cols_dates[-1]
 
 # --- Editor interactivo ---
-# Hacemos las columnas de fechas anteriores "solo lectura" 
-editable_cols = list(st.session_state.df.columns)
-if st.session_state.fecha_pasada:
-    editable_cols.remove(st.session_state.fecha_pasada)
-if st.session_state.fecha_actual:
-    editable_cols.remove(st.session_state.fecha_actual)
-
+# Solo permitir editar las columnas que no son pasadas
+editable_cols = st.session_state.df.columns.tolist()
+disabled_cols = [st.session_state.fecha_pasada] if st.session_state.fecha_pasada else []
 edited_df = st.data_editor(
     st.session_state.df,
     num_rows="dynamic",
     use_container_width=True,
-    column_config={col: st.column_config.EditableColumn() if col in editable_cols else st.column_config.EditableColumn(disabled=True) for col in st.session_state.df.columns}
+    disabled=disabled_cols
 )
 
 # --- Calcular diferencia ---
@@ -156,7 +146,6 @@ class PDF(FPDF):
         if fecha_pasada and fecha_actual:
             headers += [fecha_pasada, fecha_actual]
         headers.append("Difference")
-
         self.set_fill_color(220, 220, 220)
         for i, h in enumerate(headers):
             self.cell(col_widths[i], 8, h, border=1, align="C", fill=True)
@@ -166,7 +155,6 @@ class PDF(FPDF):
 def export_pdf(df):
     pdf = PDF()
     pdf.add_page()
-
     col_widths = [10, 60, 40]
     fecha_pasada = st.session_state.fecha_pasada
     fecha_actual = st.session_state.fecha_actual
@@ -178,21 +166,21 @@ def export_pdf(df):
 
     for idx in range(0, len(df), block_size):
         block = df.iloc[idx:idx+block_size]
-        if pdf.get_y() + row_height*(len(block)+1) > pdf.page_break_trigger:
+        if pdf.get_y() + row_height*(len(block)+2) > pdf.page_break_trigger:
             pdf.add_page()
-        for i, row in enumerate(block.itertuples(index=False)):
+        for i, row in block.iterrows():
             fill_color = (245, 245, 245) if i % 2 == 0 else (255, 255, 255)
             pdf.set_fill_color(*fill_color)
             pdf.set_font("Arial", size=10)
 
-            pdf.cell(col_widths[0], row_height, str(row.Item), border=1, align="C", fill=True)
-            pdf.cell(col_widths[1], row_height, str(row.Description).replace("–", "-"), border=1, fill=True)
-            pdf.cell(col_widths[2], row_height, str(row.Unit), border=1, align="C", fill=True)
+            pdf.cell(col_widths[0], row_height, str(row["Item"]), border=1, align="C", fill=True)
+            pdf.cell(col_widths[1], row_height, str(row["Description"]).replace("–", "-"), border=1, fill=True)
+            pdf.cell(col_widths[2], row_height, str(row["Unit"]), border=1, align="C", fill=True)
 
             if fecha_pasada and fecha_actual:
-                pdf.cell(col_widths[3], row_height, str(int(getattr(row, f'_{df.columns.get_loc(fecha_pasada)+1}'))), border=1, align="C", fill=True)
-                pdf.cell(col_widths[4], row_height, str(int(getattr(row, f'_{df.columns.get_loc(fecha_actual)+1}'))), border=1, align="C", fill=True)
-                diff = int(getattr(row, f'_{df.columns.get_loc(fecha_actual)+1}')) - int(getattr(row, f'_{df.columns.get_loc(fecha_pasada)+1}'))
+                pdf.cell(col_widths[3], row_height, str(int(row[fecha_pasada])), border=1, align="C", fill=True)
+                pdf.cell(col_widths[4], row_height, str(int(row[fecha_actual])), border=1, align="C", fill=True)
+                diff = int(row[fecha_actual]) - int(row[fecha_pasada])
             else:
                 diff = 0
 
