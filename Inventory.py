@@ -41,7 +41,12 @@ else:
         ("Avenge Pro", "1 Gal / 3.78 L"),
         ("Rob's Solvent Sealer", "1 Gal / 3.78 L"),
         ("Bio Break", "6 Lbs / 2.72 Kg"),
-        # Agregar más productos según tu lista...
+        ("Groutmaster", "6.5 Lbs / 2.95 Kg"),
+        ("Pure O2", "8 Lbs / 3.62 Kg"),
+        ("Triplephase", "1 Gal / 3.78 L"),
+        ("Green Guard (Protector)", "1 Gal / 3.78 L"),
+        ("Citrus Burst", "1 Gal / 3.78 L"),
+        # Agrega más productos según tu lista
     ]
     df = pd.DataFrame([{"Item": i+1, "Description": desc, "Unit": unit} for i, (desc, unit) in enumerate(productos)])
 
@@ -49,23 +54,22 @@ else:
 if "df" not in st.session_state:
     st.session_state.df = df
 
-# --- Selección de fecha para la nueva columna ---
-new_date = st.date_input("Selecciona la fecha de ingreso")
-col_name = new_date.strftime("%m/%d/%y")
+# --- Fecha de ingreso automática ---
+today = datetime.today()
+col_name = today.strftime("%m/%d/%y")
 if col_name not in st.session_state.df.columns:
     st.session_state.df[col_name] = 0
 
 # --- Editor para ingresar cantidades ---
-# Mostrar solo 'Description' y la columna de la fecha
 columns_to_show = ["Description", col_name]
 
-# Ajuste de ancho de columnas
+# Ajuste de ancho de columnas y edición
 column_config = {
     "Description": st.column_config.Column(
-        "Description", width="medium", editable=False
+        width="medium", editable=False
     ),
     col_name: st.column_config.Column(
-        col_name, width="small", editable=True
+        width="small", editable=True
     )
 }
 
