@@ -46,7 +46,25 @@ else:
         ("Triplephase", "1 Gal / 3.78 L"),
         ("Green Guard (Protector)", "1 Gal / 3.78 L"),
         ("Citrus Burst", "1 Gal / 3.78 L"),
-        # Agrega más productos según tu lista
+        ("Procyon Liquid", "1 Gal / 3.78 L"),
+        ("Releasit - Encap Cleaning Tech", "1 Gal / 3.78 L"),
+        ("Wool Medic", "1 Gal / 3.78 L"),
+        ("Eco Cide", "1 Gal / 3.78 L"),
+        ("Solvent Clean", "1 Gal / 3.78 L"),
+        ("Unchained", "1 Gal / 3.78 L"),
+        ("Folex", "1 Gal / 3.78 L"),
+        ("Boost All", "8 Lbs / 3.62 Kg"),
+        ("Spot Stop", "Quarter / 0.94 L"),
+        ("Releasit", "Quarter / 0.94 L"),
+        ("Red Zone ready", "Quarter / 0.94 L"),
+        ("Wool Pro", "0.47 L"),
+        ("Stain Zone", "Quarter / 0.94 L"),
+        ("Rust out", "Quarter / 0.94 L"),
+        ("T-Rust", "0.47 L"),
+        ("Filtration Soil", "473 mL"),
+        ("1 Red", "Quarter / 0.94 L"),
+        ("Filter Free", "Quarter / 0.94 L"),
+        ("All Solvent Extreme", "0.35 L"),
     ]
     df = pd.DataFrame([{"Item": i+1, "Description": desc, "Unit": unit} for i, (desc, unit) in enumerate(productos)])
 
