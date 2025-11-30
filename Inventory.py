@@ -4,6 +4,7 @@ from datetime import datetime
 from fpdf import FPDF
 import gspread
 from google.oauth2.service_account import Credentials
+import json
 
 st.set_page_config(page_title="Inventory – Carpet Cleaner", layout="centered")
 st.title("📦 Inventory – Carpet Cleaner")
@@ -16,9 +17,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = Credentials.from_service_account_file("credenciales.json", scopes=SCOPES)
+# --- Credenciales desde secrets ---
+creds_dict = st.secrets["google_service_account"]
+creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
 client = gspread.authorize(creds)
 
+# --- Abrir hoja ---
 try:
     sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 except gspread.SpreadsheetNotFound:
@@ -90,29 +94,22 @@ if st.session_state.new_load:
             st.session_state.df[col_name] = 0
         st.session_state.new_load = False
 
-# --- Selección de fechas para diferencias ---
+# --- Fechas para calcular diferencias ---
 cols_dates = [col for col in st.session_state.df.columns if "/" in col]
 if len(cols_dates) >= 2:
     st.session_state.fecha_pasada = cols_dates[-2]
     st.session_state.fecha_actual = cols_dates[-1]
 
-# --- Editor interactivo ---
-# Para evitar errores en versiones antiguas de Streamlit, no usamos disabled_columns
+# --- Editor interactivo (solo nuevas columnas editables) ---
+editable_cols = []
+if st.session_state.fecha_actual:
+    editable_cols.append(st.session_state.fecha_actual)
 edited_df = st.data_editor(
     st.session_state.df,
     num_rows="dynamic",
-    use_container_width=True
+    use_container_width=True,
+    column_config={col: st.column_config.NumberColumn(label=col) for col in editable_cols}
 )
-
-# --- Evitar modificar columnas anteriores ---
-protected_cols = ["Item", "Description", "Unit"]
-if st.session_state.fecha_pasada:
-    protected_cols.append(st.session_state.fecha_pasada)
-
-# Solo actualizar columnas que no están protegidas
-for col in edited_df.columns:
-    if col not in protected_cols:
-        st.session_state.df[col] = edited_df[col]
 
 # --- Calcular diferencia ---
 def calcular_diferencia(row):
@@ -130,11 +127,10 @@ def calcular_diferencia(row):
 
 edited_df["Difference"] = edited_df.apply(calcular_diferencia, axis=1)
 
-# --- Mostrar tabla final ---
 st.markdown("### 🧾 Inventory with difference")
 st.dataframe(edited_df, use_container_width=True)
 
-# --- Clase PDF ---
+# --- PDF ---
 class PDF(FPDF):
     def header(self):
         self.set_font("Arial", "B", 11)
@@ -158,11 +154,9 @@ class PDF(FPDF):
             self.cell(col_widths[i], 8, h, border=1, align="C", fill=True)
         self.ln()
 
-# --- Exportar PDF ---
 def export_pdf(df):
     pdf = PDF()
     pdf.add_page()
-
     col_widths = [10, 60, 40]
     fecha_pasada = st.session_state.fecha_pasada
     fecha_actual = st.session_state.fecha_actual
@@ -174,25 +168,21 @@ def export_pdf(df):
 
     for idx in range(0, len(df), block_size):
         block = df.iloc[idx:idx+block_size]
-        # Nueva página si no hay espacio
         if pdf.get_y() + row_height*(len(block)+1) > pdf.page_break_trigger:
             pdf.add_page()
         for _, row in block.iterrows():
             fill_color = (245, 245, 245) if _ % 2 == 0 else (255, 255, 255)
             pdf.set_fill_color(*fill_color)
             pdf.set_font("Arial", size=10)
-
             pdf.cell(col_widths[0], row_height, str(row["Item"]), border=1, align="C", fill=True)
             pdf.cell(col_widths[1], row_height, str(row["Description"]).replace("–", "-"), border=1, fill=True)
             pdf.cell(col_widths[2], row_height, str(row["Unit"]), border=1, align="C", fill=True)
-
             if fecha_pasada and fecha_actual:
                 pdf.cell(col_widths[3], row_height, str(int(row[fecha_pasada])), border=1, align="C", fill=True)
                 pdf.cell(col_widths[4], row_height, str(int(row[fecha_actual])), border=1, align="C", fill=True)
                 diff = int(row[fecha_actual]) - int(row[fecha_pasada])
             else:
                 diff = 0
-
             pdf.set_font("Arial", size=12)
             if diff < 0:
                 pdf.set_text_color(255, 0, 0)
@@ -203,15 +193,14 @@ def export_pdf(df):
             else:
                 pdf.set_text_color(200, 200, 0)
                 pdf.cell(col_widths[-1], row_height, "0", border=1, align="C", fill=True)
-
             pdf.set_text_color(0, 0, 0)
             pdf.ln()
         pdf.ln(5)
-
     return bytes(pdf.output(dest="S"))
 
-# --- Guardar en Google Sheets ---
+# --- Guardar Google Sheets ---
 if st.button("💾 Guardar"):
+    st.session_state.df.update(edited_df)
     df_to_save = st.session_state.df.fillna("")
     sheet.clear()
     sheet.update([df_to_save.columns.values.tolist()] + df_to_save.values.tolist())
@@ -219,7 +208,7 @@ if st.button("💾 Guardar"):
 
 # --- Exportar PDF ---
 if st.button("📤 Export to PDF"):
-    pdf_bytes = export_pdf(st.session_state.df)
+    pdf_bytes = export_pdf(edited_df)
     st.download_button(
         label="Download PDF",
         data=pdf_bytes,
